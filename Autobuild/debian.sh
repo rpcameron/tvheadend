@@ -31,6 +31,8 @@ build()
     for a in ../tvheadend*${VER}*.changes; do
         versioned_artifact "$a" changes text/plain `basename $a`
     done
+
+    bintray_publish
 }
 
 clean() 
