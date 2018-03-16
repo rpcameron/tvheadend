@@ -81,6 +81,11 @@ mpegts_init ( int linuxdvb_mask, int nosatip, str_list_t *satip_client,
   tvhdhomerun_init();
 #endif
 
+  /* CableCARD */
+#if ENABLE_CABLECARD
+  cablecard_init();
+#endif
+
   /* Mux schedulers */
 #if ENABLE_MPEGTS
   mpegts_mux_sched_init();
@@ -107,6 +112,9 @@ mpegts_done ( void )
 #endif
 #if ENABLE_HDHOMERUN_CLIENT
   tvhftrace(LS_MAIN, tvhdhomerun_done);
+#endif
+#if ENABLE_CABLECARD
+  tvhftrace(LS_MAIN, cablecard_done);
 #endif
 #if ENABLE_TSFILE
   tvhftrace(LS_MAIN, tsfile_done);

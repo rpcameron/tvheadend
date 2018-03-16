@@ -441,6 +441,14 @@ SRCS-IPTV = \
 SRCS-${CONFIG_IPTV} += $(SRCS-IPTV)
 I18N-C += $(SRCS-IPTV)
 
+# CableCARD
+SRCS-CABLECARD = \
+	src/input/mpegts/cablecard/cablecard.c \
+	src/input/mpegts/cablecard/cablecard_network.c \
+	src/input/mpegts/cablecard/cablecard_mux.c
+SRCS-${CONFIG_CABLECARD} += $(SRCS-CABLECARD)
+I18N-C += $(SRCS-CABLECARD)
+
 # TSfile
 SRCS-TSFILE = \
 	src/input/mpegts/tsfile/tsfile.c \

@@ -178,6 +178,9 @@ void tvh_input_instance_clear_stats ( tvh_input_instance_t *tii );
 #if ENABLE_HDHOMERUN_CLIENT
 #include "input/mpegts/tvhdhomerun/tvhdhomerun.h"
 #endif
+#if ENABLE_CABLECARD
+#include "input/mpegts/cablecard/cablecard.h"
+#endif
 #endif
 
 #endif /* __TVH_INPUT_H__ */

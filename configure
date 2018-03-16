@@ -29,6 +29,7 @@ OPTIONS=(
   "hdhomerun_static:yes"
   "iptv:yes"
   "tsfile:yes"
+  "cablecard:no"
   "dvbscan:yes"
   "timeshift:yes"
   "trace:yes"
