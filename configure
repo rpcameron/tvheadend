@@ -371,6 +371,10 @@ else
 
 fi
 
+if enabled cablecard; then
+  LDFLAGS="$LDFLAGS -lhdhomerun"
+fi
+
 #
 # Gzip
 #

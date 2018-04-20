@@ -18,8 +18,6 @@
 
 #include "input.h"
 
-#include "cablecard_private.h"
-
 void
 cablecard_init(void)
 {

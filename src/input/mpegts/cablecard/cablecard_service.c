@@ -32,7 +32,7 @@ cablecard_service_create(cablecard_mux_t *cm, uint16_t sid, uint16_t pmt,
 
 	cs->s_dvb_channel_num = cm->mm_cablecard_vchan;
 	cs->s_dvb_svcname = strdup(cm->mm_cablecard_name);
-	cs->s_dvb_provider = strdup(cm->mm_network->mm_provider_network_name);
+	cs->s_dvb_provider = strdup(cm->mm_network->mn_provider_network_name);
 
 	return cs;
 }

@@ -17,26 +17,34 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
- #ifndef __CABLECARD_PRIVATE_H__
- #define __CABLECARD_PRIVATE_H__
+#ifndef __CABLECARD_PRIVATE_H__
+#define __CABLECARD_PRIVATE_H__
 
 #include "libhdhomerun/hdhomerun.h"
+
+static struct hdhomerun_debug_t	   *hdhomerun_cablecard_debug_obj = 0;
 
 /*
  * Types
  */
-typedef struct cablecard_device	    cablecard_device_t;
-typedef struct cablecard_frontend	cablecard_frontend_t;
+typedef struct cablecard_device_info	cablecard_device_info_t;
+typedef struct cablecard_device	        cablecard_device_t;
+typedef struct cablecard_frontend	    cablecard_frontend_t;
 
-static struct hdhomerun_debug_t	   *hdhomerun_debug_obj = 0;
+struct	cablecard_device_info {
+	uint32_t	device_id;
+	uint32_t	ip_addr;
+	char	   *uuid;
+	char	   *model;
+	char	   *name;
+};
 
 struct	cablecard_device {
 	tvh_hardware_t;
 
-	struct hdhomerun_device_t	*hd_tuner;
-	mtimer_t	                 hd_destroy_timer;
-	uint32_t	                 ip_addr;
-	char	                    *uuid;
+	mtimer_t	hd_destroy_timer;
+
+	cablecard_device_info_t	hd_info;
 
 	TAILQ_HEAD(,cablecard_frontend)	hd_frontends;
 };
@@ -44,13 +52,16 @@ struct	cablecard_device {
 struct	cablecard_frontend {
 	mpegts_input_t;
 
-	cablecard_device_t	        *hf_device;
-	struct hdhomerun_device_t	*hf_tuner;
-	int	                         hf_locked;
-	int	                         hf_ready;
-	int	                         hf_status;
+	cablecard_device_t	*hf_device;
 
 	TAILQ_ENTRY(cablecard_frontend)	hf_link;
+
+	struct hdhomerun_device_t	*hf_tuner;
+	int	                         hf_tuner_num;
+
+	int	hf_locked;
+	int	hf_ready;
+	int	hf_status;
 
 	pthread_t	    hf_input_thread;
 	pthread_mutex_t	hf_input_thread_mutex;
@@ -65,9 +76,6 @@ struct	cablecard_frontend {
 };
 
 /* Device methods */
-void	cablecard_device_init(void);
-void	cablecard_device_done(void);
-
 void	cablecard_device_destroy(cablecard_device_t *);
 void	cablecard_device_destroy_later(cablecard_device_t *, int);
 

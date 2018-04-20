@@ -18,22 +18,11 @@
  */
 
 #include "input.h"
+#include "settings.h"
 
 /*
  * Classes
  */
-/* Class definition */
-extern const idclass_t mpegts_network_class;
-const idclass_t cablecard_network_class = {
-	.ic_super      = &mpegts_network_class,
-	.ic_class      = "cablecard_network",
-	.ic_caption    = N_("CableCARD Network"),
-	.ic_delete     = cablecard_network_class_delete,
-	.ic_properties = (const property_t[]){
-		{}
-	}
-};
-
 /* Class methods */
 static void
 cablecard_network_class_delete(idnode_t *in)
@@ -48,6 +37,19 @@ cablecard_network_class_delete(idnode_t *in)
 	/* Parent delete */
 	mpegts_network_delete(mn, 1);
 }
+
+/* Class definition */
+extern const idclass_t mpegts_network_class;
+const idclass_t cablecard_network_class = {
+	.ic_super      = &mpegts_network_class,
+	.ic_class      = "cablecard_network",
+	.ic_caption    = N_("CableCARD Network"),
+	.ic_delete     = cablecard_network_class_delete,
+	.ic_properties = (const property_t[]){
+		{}
+	}
+};
+
 
 /*
  * Type methods/callbacks
@@ -70,7 +72,7 @@ cablecard_network_create_service(mpegts_mux_t *mm, uint16_t sid,
   uint16_t pmt_pid)
 {
 	return (mpegts_service_t *)cablecard_service_create((cablecard_mux_t *)mm,
-	  sid, pmt_pid);
+	  sid, pmt_pid, NULL, NULL);
 }
 
 static const idclass_t *

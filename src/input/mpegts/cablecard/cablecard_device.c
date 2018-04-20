@@ -20,6 +20,7 @@
 #include <openssl/sha.h>
 
 #include "input.h"
+#include "settings.h"
 
 #include "cablecard_private.h"
 
@@ -72,7 +73,7 @@ cablecard_device_class_get_title(idnode_t *in, const char *lang)
 {
 	cablecard_device_t	*hd = (cablecard_device_t *)in;
 	snprintf(prop_sbuf, PROP_SBUF_LEN, "HDHomeRun CableCARD - %08X",
-	  hd->hd_tuner->device_id);
+	  hd->hd_info.device_id);
 	return prop_sbuf;
 }
 
@@ -98,10 +99,10 @@ cablecard_device_class_get_ip_address(void *obj)
 	cablecard_device_t	*hd = (cablecard_device_t *)obj;
 
 	snprintf(prop_sbuf, PROP_SBUF_LEN, "%u.%u.%u.%u",
-	  (unsigned int)(hd->ip_addr >> 24) & 0x0FF,
-	  (unsigned int)(hd->ip_addr >> 16) & 0x0FF,
-	  (unsigned int)(hd->ip_addr >>  8) & 0x0FF,
-	  (unsigned int)(hd->ip_addr >>  0) & 0x0FF);
+	  (unsigned int)(hd->hd_info.ip_addr >> 24) & 0x0FF,
+	  (unsigned int)(hd->hd_info.ip_addr >> 16) & 0x0FF,
+	  (unsigned int)(hd->hd_info.ip_addr >>  8) & 0x0FF,
+	  (unsigned int)(hd->hd_info.ip_addr >>  0) & 0x0FF);
 	return &prop_sbuf_ptr;
 }
 
@@ -110,7 +111,7 @@ cablecard_device_class_get_device_id(void *obj)
 {
 	cablecard_device_t	*hd = (cablecard_device_t *)obj;
 
-	snprintf(prop_sbuf, PROP_SBUF_LEN, "%08X", hd->hd_tuner->device_id);
+	snprintf(prop_sbuf, PROP_SBUF_LEN, "%08X", hd->hd_info.device_id);
 	return &prop_sbuf_ptr;
 }
 
@@ -134,7 +135,7 @@ const idclass_t	cablecard_device_class = {
 			.id	    = "model",
 			.name	= N_("Model"),
 			.opts	= PO_RDONLY | PO_NOSAVE,
-			.off	= offsetof(cablecard_device_t, hd_tuner->model)
+			.off	= offsetof(cablecard_device_t, hd_info.model)
 		},
 		{
 			.type	= PT_STR,
@@ -155,104 +156,10 @@ const idclass_t	cablecard_device_class = {
 			.id	    = "uuid",
 			.name	= N_("UUID"),
 			.opts	= PO_RDONLY | PO_NOSAVE,
-			.off	= offsetof(cablecard_device_t, uuid)
+			.off	= offsetof(cablecard_device_t, hd_info.uuid)
 		}
 	}
 };
-
-/* Discovery */
-typedef struct cablecard_device_discovery	cablecard_device_discovery_t;
-
-struct	cablecard_device_discovery {
-	TAILQ_ENTRY(cablecard_device_discovery)	disc_link;
-};
-
-TAILQ_HEAD(cablecard_device_discovery_queue, cablecard_device_discovery);
-
-static int	                                    cablecard_device_discoveries_count;
-static struct cablecard_device_discovery_queue	cablecard_device_discoveries;
-static pthread_t	                            cablecard_device_discovery_tid;
-static pthread_mutex_t	                        cablecard_device_discovery_lock;
-static tvh_cond_t	                            cablecard_device_discovery_cond;
-
-static void *
-cablecard_device_discovery_thread(void *aux)
-{
-	struct hdhomerun_discover_device_t	results[MAX_HDHOMERUN_DEVICES];
-	int	                                devices, brk;
-
-	while (tvheadend_is_running()) {
-		devices = hdhomerun_discover_find_devices_custom(0,
-		  HDHOMERUN_DEVICE_TYPE_TUNER, HDHOMERUN_DEVICE_ID_WILDCARD, results,
-		  MAX_HDHOMERUN_DEVICES);
-
-		if (devices > 0) {
-			while (devices > 0) {
-				devices--;
-				struct hdhomerun_discover_device_t	*device = &results[devices];
-				if (device->device_type == HDHOMERUN_DEVICE_TYPE_TUNER) {
-					pthread_mutex_lock(&global_lock);
-					cablecard_device_t *existing =
-					  cablecard_device_find(device->device_id);
-					if (tvheadend_is_running()) {
-						if (!existing) {
-							cablecard_device_create(device);
-							cablecard_device_t *hd;
-							hd = cablecard_find_device(device->device_id);
-							if (strstr(hd->hd_tuner->model, "_cablecard")) {
-								tvhinfo(LS_CABLECARD,
-								  "Found HDHomeRun CableCARD device %08X with %d tuners",
-								  device->device_id, device->tuner_count);
-							} else {
-								cablecard_device_destroy(hd);
-							}
-						} else if (existing->ip_addr != device->ip_addr) {
-							tvhinfo(LS_CABLECARD,
-							  "HDHomeRun CableCARD device %08X changed IPs: %u.%u.%u.%u -> %u.%u.%u.%u",
-							  device->device_id,
-							  (unsigned int)(existing->ip_addr >> 24) & 0x0FF,
-							  (unsigned int)(existing->ip_addr >> 16) & 0x0FF,
-							  (unsigned int)(existing->ip_addr >>  8) & 0x0FF,
-							  (unsigned int)(existing->ip_addr >>  0) & 0x0FF,
-							  (unsigned int)(device->ip_addr >> 24) & 0x0FF,
-							  (unsigned int)(device->ip_addr >> 16) & 0x0FF,
-							  (unsigned int)(device->ip_addr >>  8) & 0x0FF,
-							  (unsigned int)(device->ip_addr >>  0) & 0x0FF);
-							cablecard_device_destroy(existing);
-							cablecard_device_create(device);
-						}
-					}
-					pthread_mutex_unlock(&global_lock);
-				}
-			}
-		}
-
-		pthread_mutex_lock(&cablecard_device_discovery_lock);
-		brk = 0;
-		if (tvheadend_is_running()) {
-			brk = tvh_cond_timedwait(&cablecard_device_discovery_cond,
-			  &cablecard_device_discovery_lock, mclk() + sec2mono(15));
-			brk = !ERRNO_AGAIN(brk) && brk != ETIMEDOUT;
-		}
-		pthread_mutex_unlock(&cablecard_device_discovery_lock);
-		if (brk)
-			break;
-	}
-
-	return NULL;
-}
-
-static void
-cablecard_device_discovery_destroy(cablecard_device_discovery_t *d, int unlink)
-{
-	if (d == NULL)
-		return;
-	if (unlink) {
-		cablecard_device_discoveries--;
-		TAILQ_REMOVE(&cablecard_device_discoveries, d, disc_link);
-	}
-	free(d);
-}
 
 /* Type methods */
 static void
@@ -303,9 +210,10 @@ cablecard_device_create(struct hdhomerun_discover_device_t *disc)
 	int	                         j, save = 0;
 
 	/* Ensure this is a CableCARD device */
-	hdhomerun_tuner = hdhomerun_device_create(disc->device_info, disc->ip_addr,
+	hdhomerun_tuner = hdhomerun_device_create(disc->device_id, disc->ip_addr,
 	  0, NULL);
 	const char *model = hdhomerun_device_get_model_str(hdhomerun_tuner);
+	const char *name = hdhomerun_device_get_name(hdhomerun_tuner);
 	hdhomerun_device_destroy(hdhomerun_tuner);
 	if (!strstr(model, "_cablecard"))
 		return;
@@ -322,11 +230,14 @@ cablecard_device_create(struct hdhomerun_discover_device_t *disc)
 
 	/* From tvhdhomerun: */
 	/* we may check if uuid matches, but the SHA has should be enough */
-	if (hd->uuid)
-		free(hd->uuid);
+	if (hd->hd_info.uuid)
+		free(hd->hd_info.uuid);
 
-	hd->ip_addr = disc->ip_addr;
-	hd->uuid = strdup(uuid.hex);
+	hd->hd_info.device_id = disc->device_id;
+	hd->hd_info.ip_addr   = disc->ip_addr;
+	hd->hd_info.model     = strdup(model);
+	hd->hd_info.name      = strdup(name);
+	hd->hd_info.uuid      = strdup(uuid.hex);
 
 	if (conf)
 		feconf = htsmsg_get_map(conf, "frontends");
@@ -353,7 +264,7 @@ cablecard_device_destroy(cablecard_device_t *hd)
 {
 	cablecard_frontend_t 	*lfe;
 
-	lock_asser(&global_lock);
+	lock_assert(&global_lock);
 
 	mtimer_disarm(&hd->hd_destroy_timer);
 
@@ -363,9 +274,105 @@ cablecard_device_destroy(cablecard_device_t *hd)
 	while ((lfe = TAILQ_FIRST(&hd->hd_frontends)) != NULL)
 		cablecard_frontend_delete(lfe);
 
-	free(hd->uuid);
+	free(hd->hd_info.model);
+	free(hd->hd_info.name);
+	free(hd->hd_info.uuid);
 	tvh_hardware_delete((tvh_hardware_t *)hd);
 	free(hd);
+}
+
+/* Discovery */
+typedef struct cablecard_device_discovery	cablecard_device_discovery_t;
+
+struct	cablecard_device_discovery {
+	TAILQ_ENTRY(cablecard_device_discovery)	disc_link;
+};
+
+TAILQ_HEAD(cablecard_device_discovery_queue, cablecard_device_discovery);
+
+static int	                                    cablecard_device_discoveries_count;
+static struct cablecard_device_discovery_queue	cablecard_device_discoveries;
+static pthread_t	                            cablecard_device_discovery_tid;
+static pthread_mutex_t	                        cablecard_device_discovery_lock;
+static tvh_cond_t	                            cablecard_device_discovery_cond;
+
+static void *
+cablecard_device_discovery_thread(void *aux)
+{
+	struct hdhomerun_discover_device_t	results[MAX_HDHOMERUN_DEVICES];
+	int	                                devices, brk;
+
+	while (tvheadend_is_running()) {
+		devices = hdhomerun_discover_find_devices_custom(0,
+		  HDHOMERUN_DEVICE_TYPE_TUNER, HDHOMERUN_DEVICE_ID_WILDCARD, results,
+		  MAX_HDHOMERUN_DEVICES);
+
+		if (devices > 0) {
+			while (devices > 0) {
+				devices--;
+				struct hdhomerun_discover_device_t	*device = &results[devices];
+				if (device->device_type == HDHOMERUN_DEVICE_TYPE_TUNER) {
+					pthread_mutex_lock(&global_lock);
+					cablecard_device_t *existing =
+					  cablecard_device_find(device->device_id);
+					if (tvheadend_is_running()) {
+						if (!existing) {
+							cablecard_device_create(device);
+							cablecard_device_t *hd;
+							hd = cablecard_device_find(device->device_id);
+							if (strstr(hd->hd_info.model, "_cablecard")) {
+								tvhinfo(LS_CABLECARD,
+								  "Found HDHomeRun CableCARD device %08X with %d tuners",
+								  device->device_id, device->tuner_count);
+							} else {
+								cablecard_device_destroy(hd);
+							}
+						} else if (existing->hd_info.ip_addr != device->ip_addr) {
+							tvhinfo(LS_CABLECARD,
+							  "HDHomeRun CableCARD device %08X changed IPs: %u.%u.%u.%u -> %u.%u.%u.%u",
+							  device->device_id,
+							  (unsigned int)(existing->hd_info.ip_addr >> 24) & 0x0FF,
+							  (unsigned int)(existing->hd_info.ip_addr >> 16) & 0x0FF,
+							  (unsigned int)(existing->hd_info.ip_addr >>  8) & 0x0FF,
+							  (unsigned int)(existing->hd_info.ip_addr >>  0) & 0x0FF,
+							  (unsigned int)(device->ip_addr >> 24) & 0x0FF,
+							  (unsigned int)(device->ip_addr >> 16) & 0x0FF,
+							  (unsigned int)(device->ip_addr >>  8) & 0x0FF,
+							  (unsigned int)(device->ip_addr >>  0) & 0x0FF);
+							cablecard_device_destroy(existing);
+							cablecard_device_create(device);
+						}
+					}
+					pthread_mutex_unlock(&global_lock);
+				}
+			}
+		}
+
+		pthread_mutex_lock(&cablecard_device_discovery_lock);
+		brk = 0;
+		if (tvheadend_is_running()) {
+			brk = tvh_cond_timedwait(&cablecard_device_discovery_cond,
+			  &cablecard_device_discovery_lock, mclk() + sec2mono(15));
+			brk = !ERRNO_AGAIN(brk) && brk != ETIMEDOUT;
+		}
+		pthread_mutex_unlock(&cablecard_device_discovery_lock);
+		if (brk)
+			break;
+	}
+
+	return NULL;
+}
+
+static void
+cablecard_device_discovery_destroy(cablecard_device_discovery_t *d, int unlink)
+{
+	if (d == NULL)
+		return;
+	if (unlink) {
+		cablecard_device_discoveries_count--;
+		TAILQ_REMOVE(&cablecard_device_discoveries, d, disc_link);
+	}
+	free(d);
 }
 
 /*
@@ -374,12 +381,12 @@ cablecard_device_destroy(cablecard_device_t *hd)
 void
 cablecard_device_init(void)
 {
-	hdhomerun_debug_obj = hdhomerun_debug_create();
+	hdhomerun_cablecard_debug_obj = hdhomerun_debug_create();
 	const char *s = getenv("TVHEADEND_HDHOMERUN_DEBUG");
 
 	if (s != NULL && *s) {
-		hdhomerun_debug_set_filename(hdhomerun_debug_obj, s);
-		hdhomerun_debug_enable(hdhomerun_debug_obj);
+		hdhomerun_debug_set_filename(hdhomerun_cablecard_debug_obj, s);
+		hdhomerun_debug_enable(hdhomerun_cablecard_debug_obj);
 	}
 
 	idclass_register(&cablecard_device_class);
@@ -413,5 +420,5 @@ cablecard_device_done(void)
 		cablecard_device_discovery_destroy(d, 1);
 	}
 	pthread_mutex_unlock(&global_lock);
-	hdhomerun_debug_destroy(hdhomerun_debug_obj);
+	hdhomerun_debug_destroy(hdhomerun_cablecard_debug_obj);
 }

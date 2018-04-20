@@ -73,4 +73,8 @@ cablecard_mux_t *	cablecard_mux_create(cablecard_network_t *, const char *,
 cablecard_service_t *	cablecard_service_create(cablecard_mux_t *, uint16_t,
   uint16_t, const char *, htsmsg_t *);
 
+/* Physical network */
+void	cablecard_device_init(void);
+void	cablecard_device_done(void);
+
 #endif /* __CABLECARD_H__ */

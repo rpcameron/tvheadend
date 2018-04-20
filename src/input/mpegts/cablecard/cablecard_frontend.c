@@ -18,6 +18,8 @@
  */
 
 #include "input.h"
+#include "streaming.h"
+#include "tvhpoll.h"
 
 #include "cablecard_private.h"
 
@@ -45,8 +47,8 @@ const idclass_t	        cablecard_frontend_class = {
 			.type	= PT_INT,
 			.id	    = "fe_number",
 			.name	= N_("Frontend number"),
-			.opts	= PO_RDONLY | PO_NOSAVE,
-			.off	= offsetof(cablecard_frontend_t, hf_tuner->tuner),
+			.off	= offsetof(cablecard_frontend_t, hf_tuner_num),
+			.opts	= PO_RDONLY | PO_NOSAVE
 		}
 	}
 };
@@ -183,10 +185,10 @@ cablecard_frontend_input_thread(void *aux)
 	/* and tell the device to stream to the local port */
 	memset(target, 0, sizeof(target));
 	snprintf(target, sizeof(target), "udp://%u.%u.%u.%u:%u",
-		(unsigned int)(local_ip >> 24) & 0xFF,
-		(unsigned int)(local_ip >> 16) & 0xFF,
-		(unsigned int)(local_ip >>  8) & 0xFF,
-		(unsigned int)(local_ip >>  0) & 0xFF,
+		(unsigned int)(local_ip >> 24) & 0x0FF,
+		(unsigned int)(local_ip >> 16) & 0x0FF,
+		(unsigned int)(local_ip >>  8) & 0x0FF,
+		(unsigned int)(local_ip >>  0) & 0x0FF,
 		ntohs(sock_addr.sin_port));
 	tvhdebug(LS_CABLECARD, "setting target to: %s", target);
 	pthread_mutex_lock(&hfe->hf_tuner_mutex);
@@ -253,7 +255,7 @@ cablecard_frontend_monitor_cb(void *aux)
 {
 	cablecard_frontend_t	*hfe = (cablecard_frontend_t *)aux;
 	mpegts_mux_instance_t	*mmi = LIST_FIRST(&hfe->mi_mux_active);
-	mpegts_mux_t	        *mm;
+	cablecard_mux_t	        *cm;
 	streaming_message_t	     sm;
 	signal_status_t	         sigstat;
 	service_t	            *svc;
@@ -263,7 +265,6 @@ cablecard_frontend_monitor_cb(void *aux)
 	struct hdhomerun_tuner_vstatus_t	vstatus;
 	char	                           *status_str;
 	char	                           *vstatus_str;
-	char	                           *program;
 
 	/* Stop timer */
 	if (!mmi || !hfe->hf_ready)
@@ -281,12 +282,9 @@ cablecard_frontend_monitor_cb(void *aux)
 		tvhwarn(LS_CABLECARD, "tuner_status (%d)", res);
 	res = hdhomerun_device_get_tuner_vstatus(hfe->hf_tuner, &vstatus_str,
 	  &vstatus);
-	if (res < 1)
-		tvhwarn(LS_CABLECARD, "tuner_vstatus (%d)", res);
-	res = hdhomerun_device_get_tuner_program(hfe->hf_tuner, &program);
 	pthread_mutex_unlock(&hfe->hf_tuner_mutex);
 	if (res < 1)
-		tvhwarn(LS_CABLECARD, "tuner_program (%d)", res);
+		tvhwarn(LS_CABLECARD, "tuner_vstatus (%d)", res);
 
 	if (status.signal_present)
 		hfe->hf_status = SIGNAL_GOOD;
@@ -294,7 +292,7 @@ cablecard_frontend_monitor_cb(void *aux)
 		hfe->hf_status = SIGNAL_NONE;
 
 	/* Get current mux */
-	mm = mmi->mmi_mux;
+	cm = (cablecard_mux_t *)mmi->mmi_mux;
 
 	/* Wait for signal_present */
 	if (!hfe->hf_locked) {
@@ -302,28 +300,29 @@ cablecard_frontend_monitor_cb(void *aux)
 			tvhdebug(LS_CABLECARD, "locked");
 			hfe->hf_locked = 1;
 
-			/* Update mux/service vars */
-			if (!mm->mm_cablecard_name ||
-			  strcmp(mm->mm_cablecard_name, vstatus.name)) {
-				free(mm->mm_cablecard_name);
-				mm->mm_cablecard_name = strdup(vstatus.name);
+			/* Update mux name */
+			if (!cm->mm_cablecard_name ||
+			  strcmp(cm->mm_cablecard_name, vstatus.name)) {
+				free(cm->mm_cablecard_name);
+				cm->mm_cablecard_name = strdup(vstatus.name);
 			}
 
 			/* Start input thread */
-			tvh_pipe(0_NONBLOCK, &hfe->hf_input_thread_pipe);
+			tvh_pipe(O_NONBLOCK, &hfe->hf_input_thread_pipe);
 			pthread_mutex_lock(&hfe->hf_input_thread_mutex);
 			tvhthread_create(&hfe->hf_input_thread, NULL,
 			  cablecard_frontend_input_thread, hfe, "cc-front");
 			do {
 				e = tvh_cond_wait(&hfe->hf_input_thread_cond,
 				  &hfe->hf_input_thread_mutex);
-				if (e == TIMEDOUT)
+				if (e == ETIMEDOUT)
 					break;
 			} while (ERRNO_AGAIN(e));
 			pthread_mutex_unlock(&hfe->hf_input_thread_mutex);
 
 			/* Install table handlers */
-			psi_tables_install(mmi->mmi_input, mm, DVB_SYS_ATSC_ALL);
+			psi_tables_install(mmi->mmi_input, (mpegts_mux_t *)cm,
+			  DVB_SYS_ATSC_ALL);
 		} else {
 			/* Re-arm timer for signal lock */
 			mtimer_arm_rel(&hfe->hf_monitor_timer,
@@ -334,10 +333,10 @@ cablecard_frontend_monitor_cb(void *aux)
 	pthread_mutex_lock(&mmi->tii_stats_mutex);
 	if (status.signal_present) {
 		/* quick & dirty conversion */
-		mmi->tii_status.signal = status.signal_strength * 655.35;
+		mmi->tii_stats.signal = status.signal_strength * 655.35;
 		mmi->tii_stats.snr = status.signal_to_noise_quality * 655.35;
 	} else {
-		mmi->tii_status.snr = 0;
+		mmi->tii_stats.snr = 0;
 	}
 
 	sigstat.status_text  = signal2str(hfe->hf_status);
@@ -398,8 +397,8 @@ cablecard_frontend_start_mux(mpegts_input_t *mi, mpegts_mux_instance_t *mmi,
   int weight)
 {
 	cablecard_frontend_t	*hfe = (cablecard_frontend_t *)mi;
-	char	                 ubuf1[256];
-	char	                 ubuf2[256];
+	char	                 buf1[256];
+	char	                 buf2[256];
 	int	                     res;
 
 	mi->mi_display_name(mi, buf1, sizeof(buf1));
@@ -453,8 +452,8 @@ cablecard_frontend_save(cablecard_frontend_t *hfe, htsmsg_t *fe)
 	htsmsg_add_str(m, "uuid", idnode_uuid_as_str(&hfe->ti_id, ubuf));
 
 	/* Add to list */
-	snprintf(id, sizeof(id), "%08X-%u", hfe->hf_tuner->device_id,
-	  hfe->hf_tuner->tuner);
+	snprintf(id, sizeof(id), "%08X-%u", hfe->hf_device->hd_info.device_id,
+	  hfe->hf_tuner_num);
 	htsmsg_add_msg(fe, id, m);
 }
 
@@ -467,13 +466,13 @@ cablecard_frontend_wizard_network(cablecard_frontend_t *hfe)
 static htsmsg_t *
 cablecard_frontend_wizard_get(tvh_input_t *ti, const char *lang)
 {
-	cablecard_frontend_t	*hfe = (cablecard_network_t *)ti;
+	cablecard_frontend_t	*hfe = (cablecard_frontend_t *)ti;
 	mpegts_network_t	    *mn;
 	const idclass_t	        *idc = NULL;
 
 	mn = cablecard_frontend_wizard_network(hfe);
 	if ((mn == NULL) || (mn && mn->mn_wizard))
-		idc = cablecard_network_class;
+		idc = &cablecard_network_class;
 	return mpegts_network_wizard_get((mpegts_input_t *)hfe, idc, mn, lang);
 }
 
@@ -524,8 +523,9 @@ cablecard_frontend_create(cablecard_device_t *hd,
 		return NULL;
 
 	hfe->hf_device                   = hd;
-	hfe->hf_tuner                    = hdhomerun_discover_create(disc->device_id,
-	  disc->ip_addr, fe, hdhomerun_debug_obj);
+	hfe->hf_tuner                    = hdhomerun_device_create(disc->device_id,
+	  disc->ip_addr, fe, hdhomerun_cablecard_debug_obj);
+	hfe->hf_tuner_num                = fe;
 	hfe->hf_input_thread_running     = 0;
 	hfe->hf_input_thread_terminating = 0;
 	hfe->mi_get_weight               = cablecard_frontend_get_weight;
@@ -535,7 +535,7 @@ cablecard_frontend_create(cablecard_device_t *hd,
 	if (!hfe->mi_name) {
 		char	name[256];
 		snprintf(name, sizeof(name), "HDHomeRun CableCARD Tuner %08X-%u",
-		  disc->device_id, fe)
+		  disc->device_id, fe);
 		free(hfe->mi_name);
 		hfe->mi_name = strdup(name);
 	}
