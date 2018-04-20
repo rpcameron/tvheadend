@@ -445,7 +445,10 @@ I18N-C += $(SRCS-IPTV)
 SRCS-CABLECARD = \
 	src/input/mpegts/cablecard/cablecard.c \
 	src/input/mpegts/cablecard/cablecard_network.c \
-	src/input/mpegts/cablecard/cablecard_mux.c
+	src/input/mpegts/cablecard/cablecard_mux.c \
+	src/input/mpegts/cablecard/cablecard_service.c \
+	src/input/mpegts/cablecard/cablecard_device.c \
+	src/input/mpegts/cablecard/cablecard_frontend.c
 SRCS-${CONFIG_CABLECARD} += $(SRCS-CABLECARD)
 I18N-C += $(SRCS-CABLECARD)
 
