@@ -595,6 +595,20 @@ const idclass_t dvb_mux_atsc_c_class =
       .set      = dvb_mux_dvbt_class_frequency_set,
     },
     {
+		.type	= PT_U32,
+		.id	    = "vch_major",
+		.name	= N_("Virtual channel (major)"),
+		.off	= offsetof(dvb_mux_t, lm_tuning.dmc_fe_vchan.major),
+		.opts	= PO_ADVANCED,
+	},
+	{
+		.type	= PT_U16,
+		.id	    = "vch_minor",
+		.name	= N_("Virtual channel (minor)"),
+		.off	= offsetof(dvb_mux_t, lm_tuning.dmc_fe_vchan.minor),
+		.opts	= PO_ADVANCED,
+	},
+    {
       .type     = PT_U32,
       .id       = "symbolrate",
       .name     = N_("Symbol rate (Sym/s)"),
