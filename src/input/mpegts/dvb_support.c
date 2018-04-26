@@ -1106,15 +1106,15 @@ dvb_mux_conf_str_isdb_t ( dvb_mux_conf_t *dmc, char *buf, size_t bufsize )
 }
 
 static int
-dvb_mux_conf_str_vchan(dvb_mux_conf_t *dmn, char *buf, size_t bufsize)
+dvb_mux_conf_str_vchan(dvb_mux_conf_t *dmc, char *buf, size_t bufsize)
 {
 	if (!dmc->dmc_fe_vchan.minor)
 		return snprintf(buf, bufsize, "%s channel %u",
-		  dvb_type2str(dmc->dmc_fe_type,
+		  dvb_type2str(dmc->dmc_fe_type),
 		  dmc->dmc_fe_vchan.major);
 	else
 		return snprintf(buf, bufsize, "%s channel %u.%u",
-		  dvb_type2str(dmc->dmc_fe_type,
+		  dvb_type2str(dmc->dmc_fe_type),
 		  dmc->dmc_fe_vchan.major,
 		  dmc->dmc_fe_vchan.minor);
 }
@@ -1122,8 +1122,8 @@ dvb_mux_conf_str_vchan(dvb_mux_conf_t *dmn, char *buf, size_t bufsize)
 int
 dvb_mux_conf_str ( dvb_mux_conf_t *dmc, char *buf, size_t bufsize )
 {
-  if (dmc->dvb_fe_vchan.major)
-    return dvb_mux_conf_str_vchan(dmc, buf, bufzise);
+  if (dmc->dmc_fe_vchan.major)
+    return dvb_mux_conf_str_vchan(dmc, buf, bufsize);
   switch (dmc->dmc_fe_type) {
   case DVB_TYPE_NONE:
     return
