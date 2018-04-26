@@ -595,7 +595,7 @@ dvb_mux_class_vchan_set(void *o, const void *v)
 {
 	dvb_mux_t *lm = (dvb_mux_t *)o;
 
-	sscanf(prop_sbuf, "%u%*[-.]%hu", &lm->lm_tuning.dmc_fe_vchan.major,
+	sscanf(v, "%u%*[-.]%hu", &lm->lm_tuning.dmc_fe_vchan.major,
 	  &lm->lm_tuning.dmc_fe_vchan.minor);
 	return 0;
 }
