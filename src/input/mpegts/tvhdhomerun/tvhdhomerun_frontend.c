@@ -480,7 +480,6 @@ tvhdhomerun_frontend_start_mux
   ( mpegts_input_t *mi, mpegts_mux_instance_t *mmi, int weight )
 {
   tvhdhomerun_frontend_t *hfe = (tvhdhomerun_frontend_t*)mi;
-  dvb_mux_t *lm = (dvb_mux_t *)mmi->mmi_mux;
   int res, r;
   char buf1[256], buf2[256];
 
