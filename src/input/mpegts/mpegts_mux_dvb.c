@@ -924,29 +924,39 @@ static void
 dvb_mux_display_name ( mpegts_mux_t *mm, char *buf, size_t len )
 {
   dvb_mux_t *lm = (dvb_mux_t*)mm;
-  dvb_network_t *ln = (dvb_network_t*)mm->mm_network;
-  uint32_t freq = lm->lm_tuning.dmc_fe_freq, freq2;
-  char extra[8], buf2[5], *p;
-  if (ln->ln_type == DVB_TYPE_S) {
-    const char *s = dvb_pol2str(lm->lm_tuning.u.dmc_fe_qpsk.polarisation);
-    if (s) extra[0] = *s;
-    extra[1] = '\0';
+
+  if (lm->lm_tuning.dmc_fe_vchan.major) {
+    if (!lm->lm_tuning.dmc_fe_vchan.minor)
+      snprintf(buf, len, "%u", lm->lm_tuning.dmc_fe_vchan.major);
+	  else
+	    snprintf(buf, len, "%u.%u", lm->lm_tuning.dmc_fe_vchan.major,
+	      lm->lm_tuning.dmc_fe_vchan.minor);
   } else {
+	  dvb_network_t *ln = (dvb_network_t*)mm->mm_network;
+    uint32_t freq = lm->lm_tuning.dmc_fe_freq, freq2;
+    char extra[8], buf2[5], *p;
+
+    if (ln->ln_type == DVB_TYPE_S) {
+      const char *s = dvb_pol2str(lm->lm_tuning.u.dmc_fe_qpsk.polarisation);
+      if (s) extra[0] = *s;
+      extra[1] = '\0';
+    } else {
+      freq /= 1000;
+      strcpy(extra, "MHz");
+    }
+    freq2 = freq % 1000;
     freq /= 1000;
-    strcpy(extra, "MHz");
+    snprintf(buf2, sizeof(buf2), "%03d", freq2);
+    p = buf2 + 2;
+    while (freq2 && (freq2 % 10) == 0) {
+      freq2 /= 10;
+      *(p--) = '\0';
+    }
+    if (freq2)
+      snprintf(buf, len, "%d.%s%s", freq, buf2, extra);
+    else
+      snprintf(buf, len, "%d%s", freq, extra);
   }
-  freq2 = freq % 1000;
-  freq /= 1000;
-  snprintf(buf2, sizeof(buf2), "%03d", freq2);
-  p = buf2 + 2;
-  while (freq2 && (freq2 % 10) == 0) {
-    freq2 /= 10;
-    *(p--) = '\0';
-  }
-  if (freq2)
-    snprintf(buf, len, "%d.%s%s", freq, buf2, extra);
-  else
-    snprintf(buf, len, "%d%s", freq, extra);
 }
 
 static void
