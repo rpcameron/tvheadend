@@ -576,6 +576,30 @@ dvb_mux_atsc_c_class_delsys_enum (void *o, const char *lang)
   return list;
 }
 
+static const void *
+dvb_mux_class_vchan_get(void *o)
+{
+	dvb_mux_t *lm = (dvb_mux_t *)o;
+	if (!lm->lm_tuning.dmc_fe_vchan.minor)
+		snprintf(prop_sbuf, PROP_SBUF_LEN, "%u",
+		  lm->lm_tuning.dmc_fe_vchan.major);
+	else
+		snprintf(prop_sbuf, PROP_SBUF_LEN, "%u.%u",
+		  lm->lm_tuning.dmc_fe_vchan.major,
+		  lm->lm_tuning.dmc_fe_vchan.minor);
+	return &prop_sbuf_ptr;
+}
+
+static int
+dvb_mux_class_vchan_set(void *o, const void *v)
+{
+	dvb_mux_t *lm = (dvb_mux_t *)o;
+
+	sscanf(prop_sbuf, "%u%*[-.]%hu", &lm->lm_tuning.dmc_fe_vchan.major,
+	  &lm->lm_tuning.dmc_fe_vchan.minor);
+	return 0;
+}
+
 const idclass_t dvb_mux_atsc_c_class =
 {
   .ic_super      = &dvb_mux_class,
@@ -594,6 +618,14 @@ const idclass_t dvb_mux_atsc_c_class =
       .off      = offsetof(dvb_mux_t, lm_tuning.dmc_fe_freq),
       .set      = dvb_mux_dvbt_class_frequency_set,
     },
+    {
+      .type	= PT_STR,
+      .id	= "vch",
+      .name	= N_("Virtual channel"),
+      .get	= dvb_mux_class_vchan_get,
+      .set	= dvb_mux_class_vchan_set,
+      .opts	= PO_ADVANCED,
+	},
     {
 		.type	= PT_U32,
 		.id	    = "vch_major",
