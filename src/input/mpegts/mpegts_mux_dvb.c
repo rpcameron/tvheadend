@@ -641,6 +641,13 @@ const idclass_t dvb_mux_atsc_c_class =
 		.off	= offsetof(dvb_mux_t, lm_tuning.dmc_fe_vchan.minor),
 		.opts	= PO_RDONLY | PO_NOSAVE,
 	},
+	{
+		.type	= PT_STR,
+		.id	    = "vch_name",
+		.name	= N_("Virtual channel name"),
+		.off	= offsetof(dvb_mux_t, lm_tuning.dmc_fe_vchan.name),
+		.opts	= PO_RDONLY | PO_NOSAVE,
+	},
     {
       .type     = PT_U32,
       .id       = "symbolrate",
@@ -962,7 +969,7 @@ dvb_mux_display_name ( mpegts_mux_t *mm, char *buf, size_t len )
     if (!lm->lm_tuning.dmc_fe_vchan.minor)
       snprintf(buf, len, "%u", lm->lm_tuning.dmc_fe_vchan.major);
 	  else
-	    snprintf(buf, len, "%u.%u", lm->lm_tuning.dmc_fe_vchan.major,
+	    snprintf(buf, len, "%u-%u", lm->lm_tuning.dmc_fe_vchan.major,
 	      lm->lm_tuning.dmc_fe_vchan.minor);
   } else {
 	  dvb_network_t *ln = (dvb_network_t*)mm->mm_network;

@@ -323,6 +323,9 @@ static void tvhdhomerun_device_create(struct hdhomerun_discover_device_t *dInfo)
   } else {
     if (strstr(hd->hd_info.deviceModel, "_atsc"))
       type = DVB_TYPE_ATSC_T;
+    /* recognize CableCARD devices as ATSC-C */
+    if (strstr(hd->hd_info.deviceModel, "_cablecard"))
+      type = DVB_TYPE_ATSC_C;
   }
 
   hd->hd_override_type = strdup(dvb_type2str(type));
