@@ -406,6 +406,7 @@ typedef enum dvb_fe_type {
   DVB_TYPE_S,			/* satellite */
   DVB_TYPE_ATSC_T,		/* terrestrial - north america */
   DVB_TYPE_ATSC_C,		/* cable - north america */
+  DVB_TYPE_CABLECARD, /* CableCARD - North America */
   DVB_TYPE_ISDB_T,              /* terrestrial - japan, brazil */
   DVB_TYPE_ISDB_C,              /* cable - japan, brazil */
   DVB_TYPE_ISDB_S,              /* satellite - japan, brazil */
@@ -599,6 +600,12 @@ typedef struct dvb_isdbt_config {
   } layers[3];
 } dvb_isdbt_config_t;
 
+typedef struct dvb_fe_vchan {
+  uint32_t  num;
+  uint16_t  minor;
+  char     *name;
+} dvb_fe_vchan_t;
+
 typedef struct dvb_mux_conf
 {
   dvb_fe_type_t               dmc_fe_type;
@@ -617,6 +624,7 @@ typedef struct dvb_mux_conf
     dvb_ofdm_config_t         dmc_fe_ofdm;
     dvb_isdbt_config_t        dmc_fe_isdbt;
   } u;
+  dvb_fe_vchan_t              dmc_fe_vchan;
 
   // For scan file configurations
   LIST_ENTRY(dvb_mux_conf)    dmc_link;
