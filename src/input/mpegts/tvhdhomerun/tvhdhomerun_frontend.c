@@ -759,6 +759,10 @@ tvhdhomerun_frontend_create(tvhdhomerun_device_t *hd, struct hdhomerun_discover_
   hfe = (tvhdhomerun_frontend_t*)mpegts_input_create0((mpegts_input_t*)hfe, idc, uuid, conf);
   if (!hfe) return NULL;
 
+  if (type == DVB_TYPE_CABLECARD) {
+    hfe->mi_remove_scrambled_bits = 1;
+  }
+  
   /* Callbacks */
   hfe->mi_get_weight   = tvhdhomerun_frontend_get_weight;
   hfe->mi_get_priority = tvhdhomerun_frontend_get_priority;
